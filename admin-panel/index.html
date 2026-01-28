@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Login</title>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+  <style>
+    /* ===== Global & Body ===== */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+
+    body {
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      color: #fff;
+    }
+
+    /* ===== Login Card ===== */
+    .login-card {
+      background: rgba(255,255,255,0.95);
+      color: #203a43;
+      border-radius: 15px;
+      padding: 40px 35px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .login-card h2 {
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 26px;
+      letter-spacing: 1px;
+      color: #203a43;
+    }
+
+    /* ===== Floating Labels ===== */
+    .input-group {
+      position: relative;
+      margin-bottom: 25px;
+    }
+
+    .input-group input {
+      width: 100%;
+      padding: 14px 12px;
+      font-size: 15px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      background: transparent;
+      color: #203a43;
+      outline: none;
+    }
+
+    .input-group label {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #888;
+      pointer-events: none;
+      transition: 0.3s ease all;
+      font-size: 15px;
+      background: transparent;
+      padding: 0 4px;
+    }
+
+    .input-group input:focus + label,
+    .input-group input:not(:placeholder-shown) + label {
+      top: -10px;
+      font-size: 12px;
+      color: #27ae60;
+      background: #fff;
+    }
+
+    /* ===== Button ===== */
+    button {
+      width: 100%;
+      padding: 14px;
+      border-radius: 10px;
+      border: none;
+      background: #27ae60;
+      color: #fff;
+      font-weight: bold;
+      font-size: 16px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    button:hover {
+      background: #219150;
+    }
+
+    /* ===== Message ===== */
+    #msg {
+      margin-top: 15px;
+      font-size: 14px;
+      min-height: 18px;
+      text-align: center;
+    }
+
+    /* ===== Card Decorative Overlay ===== */
+    .login-card::before {
+      content: "";
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(45deg, #27ae60, #2980b9, #8e44ad);
+      transform: rotate(25deg);
+      opacity: 0.1;
+      pointer-events: none;
+    }
+
+    /* ===== Responsive ===== */
+    @media(max-width:480px){
+      .login-card {
+        padding: 30px 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <h2>Admin Login</h2>
+
+    <div class="input-group">
+      <input type="email" id="email" placeholder=" " required>
+      <label>Email</label>
+    </div>
+
+    <div class="input-group">
+      <input type="password" id="password" placeholder=" " required>
+      <label>Password</label>
+    </div>
+
+    <button onclick="login()">Login</button>
+    <p id="msg"></p>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAGjRba9QmovE8MSlvJTPSkKp7OsdbiqBw",
+      authDomain: "service-booking-app-56dea.firebaseapp.com",
+      projectId: "service-booking-app-56dea",
+      storageBucket: "service-booking-app-56dea.appspot.com",
+      messagingSenderId: "524636158231",
+      appId: "1:524636158231:web:f5c22b993a23d0b4b21f52",
+      measurementId: "G-5KGKREEPHG"
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    function login() {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value.trim();
+      const msg = document.getElementById("msg");
+
+      if(!email || !password){
+        msg.style.color = "#e74c3c";
+        msg.innerText = "Please enter email and password";
+        return;
+      }
+
+      firebase.auth().signInWithEmailAndPassword(email, password)
+      .then(() => {
+        msg.style.color = "#27ae60";
+        msg.innerText = "Login Successful! Redirecting...";
+        setTimeout(()=> window.location.href="dashboard.html", 1000);
+      })
+      .catch(error => {
+        msg.style.color = "#e74c3c";
+        msg.innerText = "Error: " + error.message;
+      });
+    }
+  </script>
+</body>
+</html>

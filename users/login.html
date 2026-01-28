@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Service Booking - Login</title>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <!-- 🔹 Professional CSS -->
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: "Segoe UI", Arial, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .auth-card {
+      background: #fff;
+      width: 360px;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    }
+
+    .auth-card h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #203a43;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 11px;
+      margin-bottom: 12px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+
+    button {
+      width: 100%;
+      padding: 11px;
+      background: #203a43;
+      border: none;
+      color: white;
+      font-size: 15px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #162c33;
+    }
+
+    .switch {
+      text-align: center;
+      margin-top: 15px;
+      font-size: 14px;
+    }
+
+    .switch a {
+      color: #203a43;
+      cursor: pointer;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    #msg {
+      text-align: center;
+      margin-top: 10px;
+      font-size: 13px;
+      color: red;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="auth-card">
+
+  <!-- 🔹 LOGIN -->
+  <div id="loginBox">
+    <h2>Login</h2>
+
+    <input type="email" id="loginEmail" placeholder="Email">
+    <input type="password" id="loginPassword" placeholder="Password">
+
+    <button onclick="login()">Login</button>
+
+    <div class="switch">
+      New here? <a onclick="showRegister()">Create account</a>
+    </div>
+  </div>
+
+  <!-- 🔹 REGISTER -->
+  <div id="registerBox" class="hidden">
+    <h2>Create Account</h2>
+
+    <input type="text" id="name" placeholder="Full Name">
+    <input type="email" id="regEmail" placeholder="Email">
+    <input type="password" id="regPassword" placeholder="Password">
+
+    <select id="role">
+      <option value="client">Client</option>
+      <option value="technician">Technician</option>
+    </select>
+
+    <button onclick="register()">Register</button>
+
+    <div class="switch">
+      Already have an account? <a onclick="showLogin()">Login</a>
+    </div>
+  </div>
+
+  <p id="msg"></p>
+</div>
+
+<script>
+  // 🔹 Firebase config
+  const firebaseConfig = {
+    apiKey: "AIzaSyAGjRba9QmovE8MSlvJTPSkKp7OsdbiqBw",
+    authDomain: "service-booking-app-56dea.firebaseapp.com",
+    projectId: "service-booking-app-56dea",
+    storageBucket: "service-booking-app-56dea.firebasestorage.app",
+    messagingSenderId: "524636158231",
+    appId: "1:524636158231:web:f5c22b993a23d0b4b21f52"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  function showRegister() {
+    document.getElementById("loginBox").classList.add("hidden");
+    document.getElementById("registerBox").classList.remove("hidden");
+    document.getElementById("msg").innerText = "";
+  }
+
+  function showLogin() {
+    document.getElementById("registerBox").classList.add("hidden");
+    document.getElementById("loginBox").classList.remove("hidden");
+    document.getElementById("msg").innerText = "";
+  }
+
+  // 🔹 REGISTER
+  function register() {
+    const name = document.getElementById("name").value;
+    const email = document.getElementById("regEmail").value;
+    const password = document.getElementById("regPassword").value;
+    const role = document.getElementById("role").value;
+    const msg = document.getElementById("msg");
+
+    auth.createUserWithEmailAndPassword(email, password)
+      .then((cred) => {
+        return db.collection("users").doc(cred.user.uid).set({
+          name: name,
+          email: email,
+          role: role,
+          password: password,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          
+        });
+      })
+      .then(() => {
+        msg.style.color = "green";
+        msg.innerText = "Account created successfully";
+        showLogin();
+      })
+      .catch((error) => {
+        msg.style.color = "red";
+        msg.innerText = error.message;
+      });
+  }
+
+  // 🔹 LOGIN
+  function login() {
+    const email = document.getElementById("loginEmail").value;
+    const password = document.getElementById("loginPassword").value;
+    const msg = document.getElementById("msg");
+
+    auth.signInWithEmailAndPassword(email, password)
+      .then((cred) => {
+        const uid = cred.user.uid;
+
+        db.collection("users").doc(uid).get().then((doc) => {
+          if (!doc.exists) {
+            msg.innerText = "User role not found";
+            return;
+          }
+
+          const role = doc.data().role;
+
+          if (role === "admin") location.href = "admin-dashboard.html";
+          else if (role === "technician") location.href = "technician-dashboard.html";
+          else location.href = "client-dashboard.html";
+        });
+      })
+      .catch((error) => {
+        msg.innerText = error.message;
+      });
+  }
+</script>
+
+</body>
+</html>

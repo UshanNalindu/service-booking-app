@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Technician Dashboard</title>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<style>
+body{
+  margin:0;
+  font-family:"Segoe UI",Arial;
+  background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+  color:#fff;
+}
+header{
+  background:#fff;
+  color:#203a43;
+  padding:15px 25px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  box-shadow:0 4px 8px rgba(0,0,0,0.1);
+}
+header h2{margin:0;}
+header span{font-size:14px;font-weight:bold;}
+header button{
+  background:#e74c3c;
+  border:none;
+  color:white;
+  padding:8px 14px;
+  border-radius:5px;
+  cursor:pointer;
+}
+
+.container{padding:25px; max-width:1100px; margin:auto;}
+
+.tabs{
+  margin-bottom:20px;
+}
+.tab-btn{
+  padding:8px 14px;
+  margin-right:8px;
+  border-radius:6px;
+  border:none;
+  cursor:pointer;
+  font-weight:bold;
+}
+.tab-btn.active{
+  background:#27ae60;
+  color:white;
+}
+.tab-content{display:none;}
+.tab-content.active{display:block;}
+
+.job-card{
+  background:#fff;
+  color:#203a43;
+  border-radius:10px;
+  padding:15px;
+  margin-bottom:15px;
+  box-shadow:0 3px 12px rgba(0,0,0,0.15);
+}
+.job-card h4{margin:0 0 8px 0;}
+.job-card p{margin:4px 0; font-size:14px;}
+
+.status{
+  padding:4px 8px;
+  border-radius:12px;
+  font-size:12px;
+  font-weight:bold;
+  text-transform:capitalize;
+}
+.status.pending{ background:#f39c12;color:#fff; }
+.status.accepted{ background:#27ae60;color:#fff; }
+.status.completed{ background:#2980b9;color:#fff; }
+
+button.accept, button.reject, button.complete{
+  padding:6px 12px;
+  border:none;
+  border-radius:6px;
+  margin-top:8px;
+  margin-right:6px;
+  cursor:pointer;
+  font-weight:bold;
+  transition:0.2s;
+}
+button.accept{ background:#27ae60; color:#fff;}
+button.accept:hover{ background:#219150;}
+button.reject{ background:#e74c3c; color:#fff;}
+button.reject:hover{ background:#c0392b;}
+button.complete{ background:#2980b9; color:#fff;}
+button.complete:hover{ background:#21618c;}
+
+@media(max-width:768px){
+  header{flex-direction:column;align-items:flex-start;gap:10px;}
+  .tab-btn{margin-bottom:6px;}
+  button.accept, button.reject, button.complete{width:48%; margin-right:2%;}
+} 
+</style>
+</head>
+
+<body>
+
+<header>
+  <h2>Technician Dashboard</h2>
+  <span id="techEmailDisplay"></span>
+  <button onclick="logout()">Logout</button>
+</header>
+
+<div class="container">
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('assignedJobsTab')">Assigned Jobs</button>
+    <button class="tab-btn" onclick="showTab('acceptedJobsTab')">Accepted Jobs</button>
+    <button class="tab-btn" onclick="showTab('completedJobsTab')">Completed Jobs</button>
+  </div>
+
+  <div id="assignedJobsTab" class="tab-content active">
+    <div id="assignedJobs"></div>
+  </div>
+
+  <div id="acceptedJobsTab" class="tab-content">
+    <div id="acceptedJobs"></div>
+  </div>
+
+  <div id="completedJobsTab" class="tab-content">
+    <div id="completedJobs"></div>
+  </div>
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAGjRba9QmovE8MSlvJTPSkKp7OsdbiqBw",
+  authDomain: "service-booking-app-56dea.firebaseapp.com",
+  projectId: "service-booking-app-56dea",
+  storageBucket: "service-booking-app-56dea.appspot.com",
+  messagingSenderId: "524636158231",
+  appId: "1:524636158231:web:f5c22b993a23d0b4b21f52"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+let currentUserEmail = "";
+
+firebase.auth().onAuthStateChanged(user=>{
+  if(!user){ window.location.href="login.html"; return; }
+  currentUserEmail = user.email.trim().toLowerCase();
+  document.getElementById("techEmailDisplay").innerText = currentUserEmail;
+  loadJobs();
+});
+
+function logout(){
+  firebase.auth().signOut().then(()=>window.location.href="login.html");
+}
+
+function showTab(tabId){
+  document.querySelectorAll('.tab-content').forEach(tc=>tc.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+
+  document.querySelectorAll('.tab-btn').forEach(btn=>btn.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+}
+function setTab(tab){
+  currentTab = tab;
+
+  document.querySelectorAll(".tabs button").forEach(b=>{
+    b.classList.remove("active");
+    b.classList.add("inactive");
+  });
+
+  if(tab==="assigned") tabAssigned.classList.add("active");
+  if(tab==="accepted") tabAccepted.classList.add("active");
+  if(tab==="completed") tabCompleted.classList.add("active");
+
+  loadJobs();
+}
+
+function respondJob(jobId, response) {
+
+  const user = firebase.auth().currentUser;
+  if (!user) return;
+
+  if (response === "accepted" && !confirm("Accept this job?")) return;
+  if (response === "rejected" && !confirm("Reject this job?")) return;
+
+  let updateObj = {
+    status: response,
+    technician: user.email.toLowerCase()
+  };
+
+  if (response === "accepted") {
+    updateObj.assignedAt = firebase.firestore.FieldValue.serverTimestamp();
+  }
+
+  if (response === "rejected") {
+    updateObj.rejectedAt = firebase.firestore.FieldValue.serverTimestamp();
+  }
+
+  db.collection("jobs").doc(jobId).update(updateObj)
+    .then(() => {
+      if (response === "accepted") {
+        showTab('acceptedJobsTab');
+      }
+    })
+    .catch(err => alert(err.message));
+}
+
+
+
+
+function completeJob(jobId){
+  if(!confirm("Mark this job as completed?")) return;
+  db.collection("jobs").doc(jobId).update({
+    status:"completed",
+    completedAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(()=>{}).catch(err=>alert(err.message));
+}
+
+function loadJobs() {
+
+  const assignedContainer = document.getElementById("assignedJobs");
+  const acceptedContainer = document.getElementById("acceptedJobs");
+  const completedContainer = document.getElementById("completedJobs");
+
+  const user = firebase.auth().currentUser;
+  if (!user) return;
+
+  const technicianEmail = firebase.auth().currentUser.email.toLowerCase();
+
+db.collection("jobs")
+  .where("technician", "==", technicianEmail)
+  .onSnapshot(snapshot => {
+
+      assignedContainer.innerHTML = "";
+      acceptedContainer.innerHTML = "";
+      completedContainer.innerHTML = "";
+
+      if (snapshot.empty) {
+        assignedContainer.innerHTML = "<p class='job-card'>No assigned jobs.</p>";
+        acceptedContainer.innerHTML = "<p class='job-card'>No accepted jobs.</p>";
+        completedContainer.innerHTML = "<p class='job-card'>No completed jobs.</p>";
+        return;
+      }
+
+      snapshot.forEach(doc => {
+        const job = doc.data();
+        const div = document.createElement("div");
+        div.className = "job-card";
+
+        let createdOn = job.createdAt?.toDate?.() ? job.createdAt.toDate().toLocaleString() : "-";
+        let assignedOn = job.assignedAt?.toDate?.() ? job.assignedAt.toDate().toLocaleString() : "-";
+        let completedOn = job.completedAt?.toDate?.() ? job.completedAt.toDate().toLocaleString() : "-";
+
+        if (job.status === "pending" | job.status === "assigned") {
+
+          div.innerHTML = `
+            <h4>Service: ${job.serviceType}</h4>
+            <p><strong>Client:</strong> ${job.client}</p>
+            <p><strong>Address:</strong> ${job.address}</p>
+            <p><strong>Status:</strong>
+              <span class="status ${job.status}">
+                ${job.status}
+              </span>
+            </p>
+            <p><strong>Assigned On:</strong> ${createdOn}</p>
+
+            <button onclick="respondJob('${doc.id}','accepted')" class="accept">Accept</button>
+            <button onclick="respondJob('${doc.id}','rejected')" class="reject">Reject</button>
+          `;
+          assignedContainer.appendChild(div);
+        }
+
+        else if (job.status === "accepted") {
+          div.innerHTML = `
+            <h4>Service: ${job.serviceType}</h4>
+            <p><strong>Client:</strong> ${job.client}</p>
+            <p><strong>Address:</strong> ${job.address}</p>
+            <p><strong>Status:</strong> <span class="status accepted">Accepted</span></p>
+            <p><strong>Assigned On:</strong> ${assignedOn}</p>
+            <button onclick="completeJob('${doc.id}')" class="complete">Mark as Completed</button>
+          `;
+          acceptedContainer.appendChild(div);
+        }
+
+        else if (job.status === "completed") {
+          div.innerHTML = `
+            <h4>Service: ${job.serviceType}</h4>
+            <p><strong>Client:</strong> ${job.client}</p>
+            <p><strong>Address:</strong> ${job.address}</p>
+            <p><strong>Status:</strong> <span class="status completed">Completed</span></p>
+            <p><strong>Assigned On:</strong> ${assignedOn}</p>
+            <p><strong>Completed On:</strong> ${completedOn}</p>
+          `;
+          completedContainer.appendChild(div);
+        }
+      });
+    });
+}
+
+</script>
+
+</body>
+</html>

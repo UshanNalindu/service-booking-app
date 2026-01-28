@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Client Dashboard</title>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  font-family:"Segoe UI",Arial;
+  background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+  color:#fff;
+}
+
+/* ===== HEADER ===== */
+header{
+  background:#203a43;
+  padding:15px 25px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  box-shadow:0 4px 10px rgba(0,0,0,0.25);
+}
+header h2{margin:0;font-size:20px}
+header span{font-size:14px;opacity:0.85}
+header button{
+  background:#e74c3c;
+  border:none;
+  color:#fff;
+  padding:8px 14px;
+  border-radius:6px;
+  cursor:pointer;
+}
+
+/* ===== LAYOUT ===== */
+.container{
+  max-width:1100px;
+  margin:auto;
+  padding:25px;
+}
+
+/* ===== CARD ===== */
+.card{
+  background:#fff;
+  color:#203a43;
+  border-radius:14px;
+  padding:25px;
+  box-shadow:0 8px 22px rgba(0,0,0,0.2);
+}
+
+/* ===== TABS ===== */
+.tabs{
+  display:flex;
+  gap:10px;
+  margin-bottom:20px;
+  border-bottom:2px solid #eee;
+  padding-bottom:12px;
+}
+.tab-btn{
+  border:none;
+  background:#ecf0f1;
+  color:#203a43;
+  padding:8px 18px;
+  border-radius:20px;
+  cursor:pointer;
+  font-weight:500;
+}
+.tab-btn.active{
+  background:#27ae60;
+  color:#fff;
+}
+
+/* ===== TAB CONTENT ===== */
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+h3{margin-top:0;color:#0f2027}
+
+/* ===== FORM ===== */
+input, select, textarea{
+  width:100%;
+  padding:10px;
+  margin-bottom:12px;
+  border-radius:6px;
+  border:1px solid #ccc;
+  font-size:14px;
+}
+textarea{resize:vertical;min-height:70px}
+
+button.submit{
+  background:#0183da;
+  color:#fff;
+  border:none;
+  padding:10px 18px;
+  border-radius:6px;
+  cursor:pointer;
+}
+
+/* ===== JOB CARD ===== */
+.job-card{
+  background:#fdfdfd;
+  border-radius:10px;
+  padding:15px;
+  margin-bottom:15px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.15);
+}
+.job-card p{margin:6px 0;font-size:14px}
+
+/* ===== STATUS ===== */
+.status{
+  display:inline-block;
+  padding:4px 10px;
+  border-radius:12px;
+  font-size:12px;
+  font-weight:bold;
+}
+.status.pending{background:#f39c12;color:#fff}
+.status.accepted{background:#27ae60;color:#fff}
+
+@media(max-width:600px){
+  header{flex-direction:column;gap:8px}
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h2>Client Dashboard</h2>
+  <span id="clientEmailDisplay"></span>
+  <button onclick="logout()">Logout</button>
+</header>
+
+<div class="container">
+
+  <div class="card">
+
+    <!-- TABS -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="showMainTab('submit',this)">Submit Job</button>
+      <button class="tab-btn" onclick="showMainTab('pending',this)">Pending Jobs</button>
+      <button class="tab-btn" onclick="showMainTab('accepted',this)">Accepted Jobs</button>
+    </div>
+
+    <!-- SUBMIT JOB -->
+    <div id="submit" class="tab-content active">
+      <h3>Submit a Job</h3>
+      <select id="serviceTypeSelect">
+        <option value="">Select Service Type</option>
+        <option value="Installation">Installation</option>
+        <option value="Repair">Repair</option>
+        <option value="Maintenance">Maintenance</option>
+      </select>
+      <input type="text" id="jobAddress" placeholder="Address">
+      <textarea id="jobNote" placeholder="Adisahna Note (optional)"></textarea>
+      <button class="submit" onclick="submitJob()">Submit Job</button>
+    </div>
+
+    <!-- PENDING -->
+    <div id="pending" class="tab-content">
+      <h3>Pending Jobs</h3>
+      <div id="pendingJobs"></div>
+    </div>
+
+    <!-- ACCEPTED -->
+    <div id="accepted" class="tab-content">
+      <h3>Accepted Jobs</h3>
+      <div id="acceptedJobs"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+/* ===== FIREBASE ===== */
+const firebaseConfig = {
+  apiKey: "AIzaSyAGjRba9QmovE8MSlvJTPSkKp7OsdbiqBw",
+  authDomain: "service-booking-app-56dea.firebaseapp.com",
+  projectId: "service-booking-app-56dea",
+  storageBucket: "service-booking-app-56dea.appspot.com",
+  messagingSenderId: "524636158231",
+  appId: "1:524636158231:web:f5c22b993a23d0b4b21f52"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+/* ===== AUTH ===== */
+firebase.auth().onAuthStateChanged(user=>{
+  if(!user){ window.location.href="login.html"; return; }
+  const email = user.email.toLowerCase();
+  document.getElementById("clientEmailDisplay").innerText = email;
+  loadClientJobs(email);
+});
+
+/* ===== LOGOUT ===== */
+function logout(){
+  firebase.auth().signOut().then(()=>location.href="login.html");
+}
+
+/* ===== TABS ===== */
+function showMainTab(id,btn){
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+/* ===== SUBMIT JOB ===== */
+function submitJob(){
+  const serviceType = serviceTypeSelect.value;
+  const address = jobAddress.value;
+  const note = jobNote.value;
+  const email = firebase.auth().currentUser.email.toLowerCase();
+
+  if(!serviceType || !address){
+    alert("Select service type and enter address");
+    return;
+  }
+
+  db.collection("jobs").add({
+    client: email,
+    serviceType,
+    address,
+    note,
+    technician:"",
+    status:"pending",
+    technicianResponse:"none",
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    assignedAt:null
+  }).then(()=>{
+    serviceTypeSelect.value="";
+    jobAddress.value="";
+    jobNote.value="";
+    alert("Job submitted successfully");
+  });
+}
+
+/* ===== LOAD JOBS ===== */
+function loadClientJobs(email){
+  db.collection("jobs")
+    .where("client","==",email)
+    .onSnapshot(snapshot=>{
+      pendingJobs.innerHTML="";
+      acceptedJobs.innerHTML="";
+
+      snapshot.forEach(doc=>{
+        const j = doc.data();
+        const div = document.createElement("div");
+        div.className="job-card";
+
+        let html = `
+          <p><strong>Service:</strong> ${j.serviceType}</p>
+          <p><strong>Address:</strong> ${j.address}</p>
+          <p><strong>Status:</strong> <span class="status ${j.status}">${j.status}</span></p>
+        `;
+
+        if(j.status==="pending"){
+          div.innerHTML = html;
+          pendingJobs.appendChild(div);
+        }
+
+        if(j.status==="accepted"){
+          html += `<p><strong>Technician:</strong> ${j.technician}</p>`;
+          div.innerHTML = html;
+          acceptedJobs.appendChild(div);
+        }
+      });
+    });
+}
+</script>
+
+</body>
+</html>

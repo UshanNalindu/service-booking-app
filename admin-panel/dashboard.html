@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Dashboard</title>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <!-- Font Awesome for eye icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    :root{
+      --bg:#0f172a;
+      --panel:#111827;
+      --card:#1f2933;
+      --accent:#2563eb;
+      --success:#16a34a;
+      --warning:#f59e0b;
+      --danger:#dc2626;
+      --text:#e5e7eb;
+      --muted:#9ca3af;
+    }
+
+    *{box-sizing:border-box;}
+    body{margin:0; font-family:"Segoe UI",Arial; background:var(--bg); color:var(--text);}
+    header{background:var(--panel); padding:16px 28px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #1f2937;}
+    header h2{margin:0; font-size:20px; letter-spacing:0.5px;}
+    header button{background:var(--danger); border:none; color:white; padding:8px 16px; border-radius:6px; cursor:pointer; font-weight:500;}
+    header button:hover{opacity:0.9;}
+    .container{padding:30px; display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:22px;}
+    .card{background:var(--card); border-radius:14px; padding:22px; box-shadow:0 10px 30px rgba(0,0,0,0.35);}
+    .card h3{margin-top:0; margin-bottom:15px; font-size:17px; border-bottom:1px solid #374151; padding-bottom:8px;}
+    input,select{width:100%; padding:10px 12px; margin-bottom:10px; border-radius:8px; border:1px solid #374151; background:#020617; color:var(--text);}
+    input::placeholder{color:#6b7280;}
+    button.action{background:var(--accent); border:none; color:white; padding:10px 14px; border-radius:8px; cursor:pointer; font-weight:500;}
+    button.action:hover{opacity:0.9;}
+    .status{padding:4px 10px; border-radius:20px; font-size:12px; font-weight:600; text-transform:capitalize;}
+    .status.pending{background:rgba(245,158,11,0.15); color:var(--warning);}
+    .status.accepted{background:rgba(22,163,74,0.15); color:var(--success);}
+    .status.completed{background: rgba(37, 99, 235, 0.15); color: var(--accent);}
+    .status.rejected{background:rgba(220,38,38,0.15); color:var(--danger);}
+    .status.assigned{background: rgba(111, 33, 201, 0.15); color: #8c3bf6;}
+    .tech-card,.job-card{background:#020617; border:1px solid #1f2937; border-radius:12px; padding:15px; margin-bottom:14px;}
+    .tech-card h4{margin:0 0 4px;}
+    .job-card p{margin:6px 0; font-size:14px;}
+    .job-card button{margin-top:8px; width:100%; background:var(--success); border:none; color:white; padding:8px; border-radius:8px; cursor:pointer;}
+    .job-card button:hover{opacity:0.9;}
+    .muted{color:var(--muted); font-size:13px;}
+
+    /* Password toggle styles */
+    .password-wrapper{position:relative;}
+    .password-wrapper i{position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer; font-size:16px; color:var(--text);}
+    .password-wrapper i:hover{color:var(--accent);}
+  </style>
+</head>
+<body>
+
+<header>
+  <h2>Admin Dashboard</h2>
+  <button onclick="logout()">Logout</button>
+</header>
+
+<div class="container">
+
+  <!-- Users Overview -->
+  <div class="card">
+    <h3>Users Overview</h3>
+    <p>Total Clients: <span id="totalClients">0</span></p>
+    <p>Total Technicians: <span id="totalTechs">0</span></p>
+  </div>
+
+  <!-- Add User -->
+  <div class="card">
+    <h3>Add User</h3>
+    <input type="text" id="newUserName" placeholder="Name">
+    <input type="email" id="newUserEmail" placeholder="Email">
+    <div class="password-wrapper">
+      <input type="password" id="newUserPassword" placeholder="Password">
+      <i class="fa fa-eye" id="toggleNewUserPassword"></i>
+    </div>
+    <select id="newUserRole">
+      <option value="client">Client</option>
+      <option value="technician">Technician</option>
+    </select>
+    <button class="action" onclick="addUser()">Add User</button>
+  </div>
+
+  <!-- Technicians List -->
+  <div class="card">
+    <h3>Technicians</h3>
+    <div id="techniciansList"></div>
+  </div>
+
+  <!-- Jobs Section -->
+  <div class="card">
+    <h3>All Jobs</h3>
+    <div id="jobsList"></div>
+  </div>
+
+</div>
+
+<script>
+  // Firebase Config
+  const firebaseConfig = {
+    apiKey: "AIzaSyAGjRba9QmovE8MSlvJTPSkKp7OsdbiqBw",
+    authDomain: "service-booking-app-56dea.firebaseapp.com",
+    projectId: "service-booking-app-56dea",
+    storageBucket: "service-booking-app-56dea.appspot.com",
+    messagingSenderId: "524636158231",
+    appId: "1:524636158231:web:f5c22b993a23d0b4b21f52"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  // Auth check
+  firebase.auth().onAuthStateChanged(user=>{
+    if(user){
+      loadUsersOverview();
+      loadTechnicians();
+      loadJobs();
+    } else {
+      window.location.href="index.html";
+    }
+  });
+
+  function logout(){ firebase.auth().signOut().then(()=> window.location.href="index.html"); }
+
+  // ===== Password Toggle =====
+  const toggleNewUserPassword = document.getElementById("toggleNewUserPassword");
+  const newUserPasswordInput = document.getElementById("newUserPassword");
+
+  toggleNewUserPassword.addEventListener("click", ()=>{
+    if(newUserPasswordInput.type === "password"){
+      newUserPasswordInput.type = "text";
+      toggleNewUserPassword.classList.remove("fa-eye");
+      toggleNewUserPassword.classList.add("fa-eye-slash");
+    } else {
+      newUserPasswordInput.type = "password";
+      toggleNewUserPassword.classList.remove("fa-eye-slash");
+      toggleNewUserPassword.classList.add("fa-eye");
+    }
+  });
+
+  // ===== Add User =====
+  function addUser(){
+    const name = document.getElementById("newUserName").value;
+    const email = document.getElementById("newUserEmail").value;
+    const password = document.getElementById("newUserPassword").value;
+    const role = document.getElementById("newUserRole").value;
+
+    if(!name || !email || !password){
+      alert("Enter all fields");
+      return;
+    }
+
+    db.collection("users").add({
+      name,
+      email,
+      role,
+      password,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    })
+    .then(()=>{
+      document.getElementById("newUserName").value="";
+      document.getElementById("newUserEmail").value="";
+      document.getElementById("newUserPassword").value="";
+      toggleNewUserPassword.classList.remove("fa-eye-slash");
+      toggleNewUserPassword.classList.add("fa-eye");
+      loadUsersOverview();
+      loadTechnicians();
+      alert(role + " added successfully!");
+    })
+    .catch(err=> alert("Error: "+err.message));
+  }
+
+  // ===== Users Overview =====
+  function loadUsersOverview(){
+    db.collection("users").get().then(snapshot=>{
+      let clients=0, techs=0;
+      snapshot.forEach(doc=>{
+        if(doc.data().role==="client") clients++;
+        if(doc.data().role==="technician") techs++;
+      });
+      document.getElementById("totalClients").innerText = clients;
+      document.getElementById("totalTechs").innerText = techs;
+    });
+  }
+
+  // ===== Load Technicians =====
+  function loadTechnicians(){
+    const container = document.getElementById("techniciansList");
+    container.innerHTML = "";
+
+    db.collection("users").where("role","==","technician").get()
+      .then(snapshot=>{
+        snapshot.forEach(doc=>{
+          const div = document.createElement("div");
+          div.className = "tech-card";
+          div.innerHTML = `<h4>${doc.data().name}</h4><p>Email: ${doc.data().email}</p>`;
+          container.appendChild(div);
+        });
+      });
+  }
+
+  // ===== Load Jobs =====
+  function loadJobs(){
+    const container = document.getElementById("jobsList");
+    container.innerHTML="";
+
+    db.collection("jobs").orderBy("createdAt","desc").get()
+      .then(snapshot=>{
+        snapshot.forEach(doc=>{
+          const job = doc.data();
+          const div = document.createElement("div");
+          div.className = "job-card";
+
+          let html = `
+            <p><strong>Service:</strong> ${job.serviceType}</p>
+            <p><strong>Client:</strong> ${job.client}</p>
+            <p><strong>Address:</strong> ${job.address}</p>
+            <p><strong>Status:</strong> <span class="status ${job.status}">${job.status}</span></p>
+          `;
+
+          if(job.status === "pending"){
+            html += `
+              <select id="techSelect_${doc.id}">
+                <option value="">Select Technician</option>
+              </select>
+              <button onclick="assignTechnician('${doc.id}')">Assign</button>
+            `;
+          } else if(job.status === "accepted"){
+            html += `<p><strong>Technician:</strong> ${job.technician}</p>`;
+          }
+
+          div.innerHTML = html;
+          container.appendChild(div);
+
+          if(job.status === "pending"){
+            const select = document.getElementById(`techSelect_${doc.id}`);
+            db.collection("users").where("role","==","technician").get()
+              .then(snap=>{
+                snap.forEach(tDoc=>{
+                  const option = document.createElement("option");
+                  option.value = tDoc.data().email;
+                  option.innerText = tDoc.data().name;
+                  select.appendChild(option);
+                });
+              });
+          }
+        });
+      });
+  }
+
+  // ===== Assign Technician =====
+  function assignTechnician(jobId){
+    const select = document.getElementById(`techSelect_${jobId}`);
+    const technicianEmail = select.value.trim();
+
+    if(!technicianEmail){
+      alert("Select a technician");
+      return;
+    }
+
+    db.collection("jobs").doc(jobId).update({
+      technician: technicianEmail,
+      status: "assigned",
+      assignedAt: firebase.firestore.FieldValue.serverTimestamp()
+    })
+    .then(()=>{
+      alert("Technician assigned successfully!");
+      loadJobs();
+    })
+    .catch(err=> alert("Error: "+err.message));
+  }
+
+</script>
+
+</body>
+</html>
